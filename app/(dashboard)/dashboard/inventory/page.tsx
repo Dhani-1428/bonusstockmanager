@@ -34,7 +34,7 @@ import {
 import { Label } from '@/components/ui/label'
 import { 
   Plus, Search, MoreHorizontal, Pencil, Trash2, 
-  Package, Barcode, Filter, ScanBarcode
+  Package, Barcode, Filter, ScanBarcode, Loader2
 } from 'lucide-react'
 import { toast } from 'sonner'
 import {
@@ -348,6 +348,78 @@ function ProductForm({
     sellingPrice: product?.sellingPrice || 0,
     lowStockThreshold: product?.lowStockThreshold || 5,
   })
+  const [isLookingUp, setIsLookingUp] = useState(false)
+
+  const handleBarcodeLookup = async (code: string) => {
+    if (!code || code.trim().length < 8) {
+      toast.error('Please enter a valid barcode (at least 8 digits)')
+      return
+    }
+
+    // Check if barcode already exists
+    if (!product) {
+      const existing = getProductByBarcode(code, shopId)
+      if (existing) {
+        toast.error('A product with this barcode already exists')
+        return
+      }
+    }
+    
+    // Set barcode first
+    setFormData(prev => ({ ...prev, barcode: code }))
+    
+    // Lookup product details
+    setIsLookingUp(true)
+    try {
+      const response = await fetch(`/api/lookup-barcode?barcode=${encodeURIComponent(code)}`)
+      const data = await response.json()
+      
+      if (data.success && data.product) {
+        const productInfo = data.product
+        
+        // Generate SKU from product name and brand if available
+        const generateSKU = () => {
+          if (productInfo.sku) return productInfo.sku
+          if (productInfo.name && productInfo.brand) {
+            const brandPrefix = productInfo.brand.substring(0, 3).toUpperCase()
+            const nameParts = productInfo.name.split(' ').slice(0, 2).map(w => w.substring(0, 3).toUpperCase())
+            return `${brandPrefix}-${nameParts.join('-')}-${code.substring(code.length - 4)}`
+          }
+          return code // Use barcode as SKU fallback
+        }
+        
+        // Auto-fill form with product details
+        setFormData(prev => ({
+          ...prev,
+          barcode: code,
+          name: prev.name || productInfo.name || '',
+          brand: prev.brand || productInfo.brand || '',
+          sku: prev.sku || generateSKU(),
+          // Try to match category
+          categoryId: prev.categoryId || (productInfo.category 
+            ? categories.find(c => {
+                const catLower = c.name.toLowerCase()
+                const infoCatLower = productInfo.category.toLowerCase()
+                return catLower.includes(infoCatLower) || infoCatLower.includes(catLower) ||
+                       (catLower.includes('phone') && (infoCatLower.includes('mobile') || infoCatLower.includes('phone'))) ||
+                       (catLower.includes('accessory') && (infoCatLower.includes('accessory') || infoCatLower.includes('case')))
+              })?.id || ''
+            : ''),
+          // Set price if available
+          sellingPrice: prev.sellingPrice || productInfo.price || 0,
+        }))
+        
+        toast.success(`Product details loaded: ${productInfo.name || 'Found'}`)
+      } else {
+        toast.info('Product not found in database. You can still enter details manually.')
+      }
+    } catch (error) {
+      console.error('Barcode lookup error:', error)
+      toast.info('Could not fetch product details. Please enter manually.')
+    } finally {
+      setIsLookingUp(false)
+    }
+  }
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
@@ -432,32 +504,49 @@ function ProductForm({
         <div className="space-y-2">
           <Label htmlFor="barcode">Barcode</Label>
           <div className="flex gap-2">
-            <Input
-              id="barcode"
-              value={formData.barcode}
-              onChange={(e) => setFormData({ ...formData, barcode: e.target.value })}
-              placeholder="Scan or enter barcode..."
-              className="flex-1"
-            />
-            <BarcodeScanner
-              onScan={(code) => {
-                // Check if barcode already exists
-                if (!product) {
-                  const existing = getProductByBarcode(code, shopId)
-                  if (existing) {
-                    toast.error('A product with this barcode already exists')
-                    return
+            <div className="relative flex-1">
+              <Input
+                id="barcode"
+                value={formData.barcode}
+                onChange={(e) => setFormData({ ...formData, barcode: e.target.value })}
+                placeholder="Scan or enter barcode..."
+                className="flex-1"
+                disabled={isLookingUp}
+                onKeyDown={(e) => {
+                  // Lookup on Enter if barcode is long enough
+                  if (e.key === 'Enter' && formData.barcode.length >= 8 && !isLookingUp) {
+                    e.preventDefault()
+                    handleBarcodeLookup(formData.barcode)
                   }
-                }
-                setFormData({ ...formData, barcode: code })
-                toast.success(`Barcode scanned: ${code}`)
+                }}
+              />
+              {isLookingUp && (
+                <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                  <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+                </div>
+              )}
+            </div>
+            <BarcodeScanner
+              onScan={async (code) => {
+                await handleBarcodeLookup(code)
               }}
               buttonText=""
               buttonVariant="outline"
             />
+            {formData.barcode.length >= 8 && !isLookingUp && (
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => handleBarcodeLookup(formData.barcode)}
+                title="Lookup product details"
+              >
+                <Search className="h-4 w-4" />
+              </Button>
+            )}
           </div>
           <p className="text-xs text-muted-foreground">
             {product ? 'Leave empty to keep current barcode' : 'Leave empty to auto-generate'}
+            {formData.barcode && ' • Press Enter or click search to lookup product details'}
           </p>
         </div>
         <div className="space-y-2">
