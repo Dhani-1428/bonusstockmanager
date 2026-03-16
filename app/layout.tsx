@@ -10,24 +10,11 @@ const _geist = Geist({ subsets: ["latin"] });
 const _geistMono = Geist_Mono({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: 'MobileStock Pro - Inventory & POS Management',
-  description: 'Modern SaaS platform for mobile phone shop inventory and POS management with barcode scanning, IMEI tracking, and multi-shop support.',
-  generator: 'v0.app',
+  title: 'Bonus Stock Manager - Inventory & POS',
+  description: 'Modern stock management system for mobile phone shops with barcode scanning, IMEI tracking, and multi-shop support.',
   icons: {
-    icon: [
-      {
-        url: '/icon-light-32x32.png',
-        media: '(prefers-color-scheme: light)',
-      },
-      {
-        url: '/icon-dark-32x32.png',
-        media: '(prefers-color-scheme: dark)',
-      },
-      {
-        url: '/icon.svg',
-        type: 'image/svg+xml',
-      },
-    ],
+    icon: '/icon.svg',
+    shortcut: '/icon.svg',
     apple: '/apple-icon.png',
   },
 }
