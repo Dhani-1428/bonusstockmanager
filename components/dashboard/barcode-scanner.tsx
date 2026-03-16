@@ -122,81 +122,129 @@ export function BarcodeScanner({
 
   const startCamera = async () => {
     try {
-      if (!videoRef.current) return
-      
       setCameraError(null)
+      setIsScanning(true) // Set scanning state early to show loading
+      
+      // Check if getUserMedia is available
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        throw new Error('Camera API not supported in this browser')
+      }
+      
+      // Wait a bit to ensure video element is rendered
+      await new Promise(resolve => setTimeout(resolve, 100))
+      
+      if (!videoRef.current) {
+        throw new Error('Video element not available')
+      }
+      
       const codeReader = new BrowserMultiFormatReader()
       codeReaderRef.current = codeReader
       
-      // Better video constraints for mobile devices
+      // Simplified video constraints for better compatibility
       const constraints: MediaStreamConstraints = {
         video: {
           facingMode: facingMode,
-          width: { ideal: isMobile() ? 1280 : 1920 },
-          height: { ideal: isMobile() ? 720 : 1080 },
-          // Enable autofocus on mobile
-          focusMode: 'continuous',
+          // Remove focusMode as it's not widely supported
+          // width and height constraints can cause issues on some devices
         },
       }
       
+      console.log('Requesting camera access...')
       const stream = await navigator.mediaDevices.getUserMedia(constraints)
+      console.log('Camera access granted')
+      
       streamRef.current = stream
+      
+      if (!videoRef.current) {
+        stream.getTracks().forEach(track => track.stop())
+        throw new Error('Video element disappeared')
+      }
+      
       videoRef.current.srcObject = stream
-      setIsScanning(true)
+      videoRef.current.play().catch(err => {
+        console.error('Error playing video:', err)
+        toast.error('Error starting camera preview')
+      })
       
       // On mobile, enter fullscreen for better scanning experience
       if (isMobile()) {
-        setIsFullscreen(true)
+        setTimeout(() => {
+          setIsFullscreen(true)
+        }, 300)
       }
       
       // Wait for video to be ready, then start scanning
       const startScanning = () => {
-        if (!videoRef.current || !codeReaderRef.current) return
+        if (!videoRef.current || !codeReaderRef.current) {
+          console.error('Video or codeReader not available for scanning')
+          return
+        }
+        
+        console.log('Starting barcode scanning...')
         
         // Use decodeFromVideoDevice which continuously scans
-        codeReaderRef.current.decodeFromVideoDevice(
-          null,
-          videoRef.current,
-          (result, error) => {
-            if (result) {
-              const code = result.getText()
-              
-              // Haptic feedback on mobile
-              if (navigator.vibrate) {
-                navigator.vibrate(100)
+        try {
+          codeReaderRef.current.decodeFromVideoDevice(
+            null,
+            videoRef.current,
+            (result, error) => {
+              if (result) {
+                const code = result.getText()
+                console.log('Barcode detected:', code)
+                
+                // Haptic feedback on mobile
+                if (navigator.vibrate) {
+                  navigator.vibrate(100)
+                }
+                
+                onScan(code)
+                stopCamera()
+                setOpen(false)
+                toast.success(`Scanned: ${code}`)
               }
-              
-              onScan(code)
-              stopCamera()
-              setOpen(false)
-              toast.success(`Scanned: ${code}`)
+              // NotFoundException is expected when no barcode is in view
+              if (error && error.name !== 'NotFoundException') {
+                console.debug('Barcode scan error:', error.name)
+              }
             }
-            // NotFoundException is expected when no barcode is in view
-            if (error && error.name !== 'NotFoundException') {
-              console.debug('Barcode scan error:', error.name)
-            }
-          }
-        )
+          )
+        } catch (scanError) {
+          console.error('Error starting barcode scanner:', scanError)
+          toast.error('Error starting barcode scanner')
+        }
       }
       
+      // Wait for video metadata to load
       if (videoRef.current.readyState >= 2) {
         // Video already loaded
         startScanning()
       } else {
-        videoRef.current.onloadedmetadata = startScanning
+        videoRef.current.onloadedmetadata = () => {
+          console.log('Video metadata loaded')
+          startScanning()
+        }
+        
+        // Fallback timeout
+        setTimeout(() => {
+          if (videoRef.current && videoRef.current.readyState >= 2) {
+            startScanning()
+          }
+        }, 1000)
       }
     } catch (error: any) {
       console.error('Camera access error:', error)
       setCameraError(error.message || 'Could not access camera')
+      setIsScanning(false)
       
       if (error.name === 'NotAllowedError' || error.name === 'PermissionDeniedError') {
-        toast.error('Camera permission denied. Please allow camera access in your browser settings.')
+        toast.error('Camera permission denied. Please allow camera access in your browser settings and try again.')
       } else if (error.name === 'NotFoundError' || error.name === 'DevicesNotFoundError') {
         toast.error('No camera found on this device.')
+      } else if (error.name === 'NotReadableError' || error.name === 'TrackStartError') {
+        toast.error('Camera is already in use by another application. Please close it and try again.')
       } else {
-        toast.error('Could not access camera. Please try again.')
+        toast.error(`Could not access camera: ${error.message || 'Unknown error'}`)
       }
-      setIsScanning(false)
     }
   }
 
@@ -351,14 +399,43 @@ export function BarcodeScanner({
                   <>
                     {cameraError && (
                       <div className="mb-4 p-3 bg-destructive/10 border border-destructive/20 rounded-lg text-sm text-destructive">
-                        {cameraError}
+                        <p className="font-medium">Camera Error:</p>
+                        <p className="mt-1">{cameraError}</p>
+                        <Button 
+                          onClick={() => {
+                            setCameraError(null)
+                            startCamera()
+                          }} 
+                          variant="outline" 
+                          size="sm" 
+                          className="mt-2"
+                        >
+                          Try Again
+                        </Button>
                       </div>
                     )}
-                    <Button onClick={startCamera} className="w-full" variant="outline" size="lg">
+                    <Button 
+                      onClick={(e) => {
+                        e.preventDefault()
+                        e.stopPropagation()
+                        console.log('Start camera button clicked')
+                        startCamera()
+                      }} 
+                      className="w-full" 
+                      variant="outline" 
+                      size="lg"
+                      disabled={!hasCamera}
+                      type="button"
+                    >
                       <Camera className="h-5 w-5 mr-2" />
-                      Start Camera Scan
+                      {hasCamera ? 'Start Camera Scan' : 'Camera Not Available'}
                     </Button>
-                    {isMobile() && (
+                    {!hasCamera && (
+                      <p className="text-xs text-muted-foreground text-center mt-2">
+                        No camera detected on this device
+                      </p>
+                    )}
+                    {hasCamera && isMobile() && (
                       <p className="text-xs text-muted-foreground text-center mt-2">
                         Tap to scan barcodes with your camera
                       </p>
