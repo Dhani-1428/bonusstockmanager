@@ -58,13 +58,16 @@ export default function SubscriptionPage() {
 
     setIsProcessing(true)
     try {
-      // Check if user already has an active subscription
+      // Check if user already has an active subscription (but allow trial users to upgrade)
       const existingSub = getUserSubscription(user.id)
-      if (existingSub && (existingSub.status === 'active' || existingSub.status === 'trial')) {
+      if (existingSub && existingSub.status === 'active') {
         toast.error('You already have an active subscription')
         setIsProcessing(false)
         return
       }
+
+      // If user is on trial, they can upgrade to paid
+      const isUpgradingFromTrial = existingSub?.status === 'trial'
 
       // Find or create subscription plan
       const subscriptions = getSubscriptions()
