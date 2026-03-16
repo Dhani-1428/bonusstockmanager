@@ -2,7 +2,8 @@
 
 import type { 
   User, Shop, Product, Category, IMEIRecord, 
-  Supplier, PurchaseRecord, Sale, StockTransfer, Customer
+  Supplier, PurchaseRecord, Sale, StockTransfer, Customer,
+  Subscription, UserSubscription
 } from './types'
 
 const STORAGE_KEYS = {
@@ -18,6 +19,8 @@ const STORAGE_KEYS = {
   STOCK_TRANSFERS: 'pos_stock_transfers',
   CURRENT_SHOP: 'pos_current_shop',
   CUSTOMERS: 'pos_customers',
+  SUBSCRIPTIONS: 'pos_subscriptions',
+  USER_SUBSCRIPTIONS: 'pos_user_subscriptions',
 } as const
 
 function getItem<T>(key: string, defaultValue: T): T {
@@ -493,4 +496,112 @@ export function updateCustomer(shopId: string, customerId: string, updates: Part
 export function deleteCustomer(shopId: string, customerId: string): void {
   const customers = getItem<Customer[]>(STORAGE_KEYS.CUSTOMERS, [])
   setItem(STORAGE_KEYS.CUSTOMERS, customers.filter(c => !(c.id === customerId && c.shopId === shopId)))
+}
+
+// Subscription functions
+export function getSubscriptions(): Subscription[] {
+  return getItem<Subscription[]>(STORAGE_KEYS.SUBSCRIPTIONS, [])
+}
+
+export function createSubscription(subscriptionData: Omit<Subscription, 'id' | 'createdAt'>): Subscription {
+  const subscriptions = getItem<Subscription[]>(STORAGE_KEYS.SUBSCRIPTIONS, [])
+  const newSubscription: Subscription = {
+    ...subscriptionData,
+    id: generateId(),
+    createdAt: new Date().toISOString(),
+  }
+  subscriptions.push(newSubscription)
+  setItem(STORAGE_KEYS.SUBSCRIPTIONS, subscriptions)
+  return newSubscription
+}
+
+export function getUserSubscription(userId: string): UserSubscription | null {
+  const subscriptions = getItem<UserSubscription[]>(STORAGE_KEYS.USER_SUBSCRIPTIONS, [])
+  return subscriptions.find(s => s.userId === userId && s.status !== 'cancelled') || null
+}
+
+export function createUserSubscription(
+  userId: string,
+  subscriptionId: string,
+  startTrial: boolean = true
+): UserSubscription {
+  const subscriptions = getItem<UserSubscription[]>(STORAGE_KEYS.USER_SUBSCRIPTIONS, [])
+  const subscription = getSubscriptions().find(s => s.id === subscriptionId)
+  if (!subscription) {
+    throw new Error('Subscription not found')
+  }
+
+  const now = new Date()
+  const trialEndDate = startTrial ? new Date(now.getTime() + 15 * 24 * 60 * 60 * 1000) : null
+  
+  // Calculate end date based on billing cycle
+  let endDate = new Date(now)
+  if (!startTrial) {
+    if (subscription.billingCycle === 'monthly') {
+      endDate = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000)
+    } else if (subscription.billingCycle === '6months') {
+      endDate = new Date(now.getTime() + 180 * 24 * 60 * 60 * 1000)
+    } else if (subscription.billingCycle === 'yearly') {
+      endDate = new Date(now.getTime() + 365 * 24 * 60 * 60 * 1000)
+    }
+  } else {
+    endDate = trialEndDate || now
+  }
+
+  const newUserSubscription: UserSubscription = {
+    id: generateId(),
+    userId,
+    subscriptionId,
+    status: startTrial ? 'trial' : 'active',
+    startDate: now.toISOString(),
+    endDate: endDate.toISOString(),
+    trialEndDate: trialEndDate?.toISOString(),
+    autoRenew: true,
+    createdAt: now.toISOString(),
+  }
+
+  subscriptions.push(newUserSubscription)
+  setItem(STORAGE_KEYS.USER_SUBSCRIPTIONS, subscriptions)
+
+  // Update user subscription status
+  updateUser(userId, {
+    subscriptionId,
+    subscriptionStatus: startTrial ? 'trial' : 'active',
+    subscriptionEndDate: endDate.toISOString(),
+  })
+
+  return newUserSubscription
+}
+
+export function updateUserSubscription(
+  subscriptionId: string,
+  updates: Partial<UserSubscription>
+): UserSubscription | null {
+  const subscriptions = getItem<UserSubscription[]>(STORAGE_KEYS.USER_SUBSCRIPTIONS, [])
+  const index = subscriptions.findIndex(s => s.id === subscriptionId)
+  if (index === -1) return null
+  
+  subscriptions[index] = { ...subscriptions[index], ...updates }
+  setItem(STORAGE_KEYS.USER_SUBSCRIPTIONS, subscriptions)
+  return subscriptions[index]
+}
+
+export function checkTrialStatus(userId: string): { isTrial: boolean; daysRemaining: number } {
+  const userSubscription = getUserSubscription(userId)
+  if (!userSubscription || userSubscription.status !== 'trial') {
+    return { isTrial: false, daysRemaining: 0 }
+  }
+
+  const trialEnd = new Date(userSubscription.trialEndDate || userSubscription.endDate)
+  const now = new Date()
+  const daysRemaining = Math.max(0, Math.ceil((trialEnd.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)))
+
+  if (daysRemaining === 0 && userSubscription.status === 'trial') {
+    // Trial expired, update status
+    updateUserSubscription(userSubscription.id, { status: 'expired' })
+    updateUser(userId, { subscriptionStatus: 'inactive' })
+    return { isTrial: false, daysRemaining: 0 }
+  }
+
+  return { isTrial: true, daysRemaining }
 }

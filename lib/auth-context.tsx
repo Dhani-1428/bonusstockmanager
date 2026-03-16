@@ -5,7 +5,7 @@ import type { User, Shop } from './types'
 import { 
   getCurrentUser, setCurrentUser, getUserByEmail, createUser, 
   getUsers, updateUser, createShop, getUserShops, getCurrentShop, 
-  setCurrentShop, getShopById 
+  setCurrentShop, getShopById, createSubscription, createUserSubscription
 } from './store'
 
 interface AuthContextType {
@@ -100,6 +100,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     // Update user with shop ID
     updateUser(newUser.id, { shopIds: [newShop.id] })
+
+    // Start free trial for new users
+    try {
+      // Create a default single shop subscription for trial
+      const trialSubscription = createSubscription({
+        name: 'Free Trial - Single Shop',
+        price: 0,
+        billingCycle: 'monthly',
+        shopType: 'single',
+        features: ['All Features', '15 Days Free'],
+        maxShops: 1,
+        maxProducts: 999999,
+        maxUsers: 999,
+        isActive: true,
+      })
+      
+      createUserSubscription(newUser.id, trialSubscription.id, true)
+    } catch (error) {
+      console.error('Failed to start free trial:', error)
+    }
 
     setCurrentUser({ ...newUser, shopIds: [newShop.id] })
     setCurrentShop(newShop.id)

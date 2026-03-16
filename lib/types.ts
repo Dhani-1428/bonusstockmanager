@@ -28,12 +28,25 @@ export interface Subscription {
   id: string
   name: string
   price: number
-  billingCycle: 'monthly' | 'yearly'
+  billingCycle: 'monthly' | '6months' | 'yearly'
+  shopType: 'single' | 'multiple'
   features: string[]
   maxShops: number
   maxProducts: number
   maxUsers: number
   isActive: boolean
+  createdAt: string
+}
+
+export interface UserSubscription {
+  id: string
+  userId: string
+  subscriptionId: string
+  status: 'trial' | 'active' | 'expired' | 'cancelled'
+  startDate: string
+  endDate: string
+  trialEndDate?: string
+  autoRenew: boolean
   createdAt: string
 }
 

@@ -6,7 +6,7 @@ import { cn } from '@/lib/utils'
 import { 
   Smartphone, LayoutDashboard, Package, ShoppingCart, 
   Users, BarChart3, Settings, Truck, FolderTree, LogOut,
-  Receipt, UserCircle, Store
+  Receipt, UserCircle, Store, Crown
 } from 'lucide-react'
 import { useAuth } from '@/lib/auth-context'
 import { Button } from '@/components/ui/button'
@@ -23,6 +23,7 @@ const navItems = [
   { href: '/dashboard/reports', label: 'Reports', icon: BarChart3 },
   { href: '/dashboard/shops', label: 'Shops', icon: Store },
   { href: '/dashboard/users', label: 'Users', icon: Users },
+  { href: '/dashboard/subscription', label: 'Subscription', icon: Crown },
   { href: '/dashboard/settings', label: 'Settings', icon: Settings },
 ]
 
