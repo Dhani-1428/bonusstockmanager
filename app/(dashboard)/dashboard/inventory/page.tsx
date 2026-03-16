@@ -4,7 +4,7 @@ import { useEffect, useState, useMemo } from 'react'
 import { useAuth } from '@/lib/auth-context'
 import { 
   getProducts, getCategories, deleteProduct, 
-  getAvailableIMEIs, createProduct, updateProduct 
+  getAvailableIMEIs, createProduct, updateProduct, getProductByBarcode
 } from '@/lib/store'
 import type { Product, Category } from '@/lib/types'
 import { Button } from '@/components/ui/button'
@@ -45,6 +45,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { IMEIManager } from '@/components/dashboard/imei-manager'
+import { BarcodeScanner } from '@/components/dashboard/barcode-scanner'
 
 export default function InventoryPage() {
   const { currentShop } = useAuth()
@@ -341,6 +342,7 @@ function ProductForm({
     brand: product?.brand || '',
     categoryId: product?.categoryId || '',
     sku: product?.sku || '',
+    barcode: product?.barcode || '',
     stockQuantity: product?.stockQuantity || 0,
     purchasePrice: product?.purchasePrice || 0,
     sellingPrice: product?.sellingPrice || 0,
@@ -359,9 +361,19 @@ function ProductForm({
       updateProduct(product.id, formData)
       toast.success('Product updated')
     } else {
+      // Check if barcode already exists
+      if (formData.barcode) {
+        const existingProduct = getProducts(shopId).find(p => p.barcode === formData.barcode)
+        if (existingProduct) {
+          toast.error('A product with this barcode already exists')
+          return
+        }
+      }
+      
       createProduct({
         ...formData,
         shopId,
+        barcode: formData.barcode.trim() || undefined, // Let store generate if empty
       })
       toast.success('Product created')
     }
@@ -416,6 +428,37 @@ function ProductForm({
             onChange={(e) => setFormData({ ...formData, sku: e.target.value })}
             placeholder="IP15PRO-256-BLK"
           />
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor="barcode">Barcode</Label>
+          <div className="flex gap-2">
+            <Input
+              id="barcode"
+              value={formData.barcode}
+              onChange={(e) => setFormData({ ...formData, barcode: e.target.value })}
+              placeholder="Scan or enter barcode..."
+              className="flex-1"
+            />
+            <BarcodeScanner
+              onScan={(code) => {
+                // Check if barcode already exists
+                if (!product) {
+                  const existing = getProductByBarcode(code, shopId)
+                  if (existing) {
+                    toast.error('A product with this barcode already exists')
+                    return
+                  }
+                }
+                setFormData({ ...formData, barcode: code })
+                toast.success(`Barcode scanned: ${code}`)
+              }}
+              buttonText=""
+              buttonVariant="outline"
+            />
+          </div>
+          <p className="text-xs text-muted-foreground">
+            {product ? 'Leave empty to keep current barcode' : 'Leave empty to auto-generate'}
+          </p>
         </div>
         <div className="space-y-2">
           <Label htmlFor="stock">Stock Quantity</Label>

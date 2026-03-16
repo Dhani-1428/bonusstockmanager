@@ -170,12 +170,12 @@ export function getProductByBarcode(barcode: string, shopId: string): Product | 
   return getProducts(shopId).find(p => p.barcode === barcode)
 }
 
-export function createProduct(productData: Omit<Product, 'id' | 'createdAt' | 'barcode'>): Product {
+export function createProduct(productData: Omit<Product, 'id' | 'createdAt' | 'barcode'> & { barcode?: string }): Product {
   const products = getItem<Product[]>(STORAGE_KEYS.PRODUCTS, [])
   const newProduct: Product = {
     ...productData,
     id: generateId(),
-    barcode: generateBarcode(),
+    barcode: productData.barcode || generateBarcode(),
     createdAt: new Date().toISOString(),
   }
   products.push(newProduct)
