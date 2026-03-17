@@ -53,16 +53,20 @@ export function BarcodeScanner({
   // Check for camera availability
   useEffect(() => {
     const checkCamera = async () => {
-      if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
-        try {
-          // Try to enumerate devices to check if camera exists
-          const devices = await navigator.mediaDevices.enumerateDevices()
-          const hasVideoInput = devices.some(device => device.kind === 'videoinput')
-          setHasCamera(hasVideoInput)
-        } catch {
-          // If enumeration fails, assume camera might be available
-          setHasCamera(true)
-        }
+      // On some mobile browsers (notably iOS Safari), enumerateDevices may return
+      // an empty list until camera permission is granted. If getUserMedia exists,
+      // we treat the camera as "available" and let startCamera() handle errors.
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        setHasCamera(false)
+        return
+      }
+
+      try {
+        const devices = await navigator.mediaDevices.enumerateDevices()
+        const hasVideoInput = devices.some(device => device.kind === 'videoinput')
+        setHasCamera(hasVideoInput || isMobile())
+      } catch {
+        setHasCamera(true)
       }
     }
     checkCamera()
@@ -142,11 +146,11 @@ export function BarcodeScanner({
       
       // Simplified video constraints for better compatibility
       const constraints: MediaStreamConstraints = {
+        audio: false,
         video: {
-          facingMode: facingMode,
-          // Remove focusMode as it's not widely supported
-          // width and height constraints can cause issues on some devices
-        },
+          // iOS Safari is more reliable with ideal facingMode constraints
+          facingMode: { ideal: facingMode },
+        } as MediaTrackConstraints,
       }
       
       console.log('Requesting camera access...')
@@ -161,15 +165,20 @@ export function BarcodeScanner({
       }
       
       videoRef.current.srcObject = stream
-      videoRef.current.play().catch(err => {
+      // iOS Safari is picky: ensure these are set before play()
+      videoRef.current.muted = true
+      ;(videoRef.current as any).playsInline = true
+      await videoRef.current.play().catch(err => {
         console.error('Error playing video:', err)
-        toast.error('Error starting camera preview')
+        throw err
       })
       
       // On mobile, enter fullscreen for better scanning experience
       if (isMobile()) {
         setTimeout(() => {
-          setIsFullscreen(true)
+          // Avoid attempting fullscreen on iOS Safari (not supported for arbitrary elements)
+          const isIOS = /iPad|iPhone|iPod/i.test(navigator.userAgent)
+          if (!isIOS) setIsFullscreen(true)
         }, 300)
       }
       
