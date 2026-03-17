@@ -79,7 +79,7 @@ export default function LandingPage() {
             <span className="text-xl font-semibold">MobileStock Pro</span>
           </div>
           <div className="hidden items-center gap-8 md:flex">
-            <a href="#features" className="text-sm text-muted-foreground transition-colors hover:text-foreground">Features</a>
+            <Link href="/features" className="text-sm text-muted-foreground transition-colors hover:text-foreground">Features</Link>
             <a href="#pricing" className="text-sm text-muted-foreground transition-colors hover:text-foreground">Pricing</a>
           </div>
           <div className="flex items-center gap-3">
