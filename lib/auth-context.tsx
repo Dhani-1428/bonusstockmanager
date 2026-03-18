@@ -69,6 +69,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     
     setCurrentUser(existingUser)
     refreshUser()
+
+    // Notify user by email about successful login.
+    // Fail silently if email sending fails (don't block login UX).
+    try {
+      await fetch('/api/send-auth-email', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          type: 'login',
+          email: existingUser.email,
+          username: existingUser.email,
+          name: existingUser.name,
+          loginTime: new Date().toISOString(),
+        }),
+      })
+    } catch (err) {
+      console.error('Failed to send login email:', err)
+    }
+
     return { success: true }
   }
 
@@ -124,6 +143,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setCurrentUser({ ...newUser, shopIds: [newShop.id] })
     setCurrentShop(newShop.id)
     refreshUser()
+
+    // Send credentials to the user's email on signup (username=email).
+    // Fail silently if email sending fails.
+    try {
+      await fetch('/api/send-auth-email', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          type: 'signup',
+          email: newUser.email,
+          username: newUser.email,
+          name: newUser.name,
+          password,
+        }),
+      })
+    } catch (err) {
+      console.error('Failed to send signup email:', err)
+    }
     
     return { success: true }
   }
