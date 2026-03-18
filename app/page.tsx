@@ -42,27 +42,39 @@ const features = [
   },
 ]
 
-const plans = [
+const freeTrial = {
+  price: '€0',
+  days: '15 days',
+  label: 'Free Trial',
+}
+
+const pricingTiers = [
   {
-    name: 'Starter',
-    price: 'Free',
-    description: 'Perfect for small shops getting started',
-    features: ['1 Shop Location', 'Up to 100 Products', 'Basic POS', 'Receipt Printing', 'Email Support'],
+    key: '1month',
+    title: '1 Month',
+    singlePrice: 20,
+    singleSuffix: '/ month',
+    multiPrice: 40,
+    multiSuffix: '/ month',
+    highlight: false,
   },
   {
-    name: 'Professional',
-    price: '$29',
-    period: '/month',
-    description: 'For growing businesses',
-    features: ['3 Shop Locations', 'Unlimited Products', 'Advanced POS', 'IMEI Tracking', 'Analytics Dashboard', 'WhatsApp Receipts', 'Priority Support'],
-    popular: true,
+    key: '6months',
+    title: '6 Months',
+    singlePrice: 150,
+    singleSuffix: '/ 6 months',
+    multiPrice: 190,
+    multiSuffix: '/ 6 months',
+    highlight: true,
   },
   {
-    name: 'Enterprise',
-    price: '$79',
-    period: '/month',
-    description: 'For large operations',
-    features: ['Unlimited Shops', 'Unlimited Products', 'Full POS Suite', 'Advanced Analytics', 'Stock Transfers', 'API Access', 'Dedicated Support'],
+    key: '12months',
+    title: '12 Months',
+    singlePrice: 210,
+    singleSuffix: '/ 12 months',
+    multiPrice: 250,
+    multiSuffix: '/ 12 months',
+    highlight: false,
   },
 ]
 
@@ -79,7 +91,7 @@ export default function LandingPage() {
             <span className="text-xl font-semibold">MobileStock Pro</span>
           </div>
           <div className="hidden items-center gap-8 md:flex">
-            <Link href="/features" className="text-sm text-muted-foreground transition-colors hover:text-foreground">Features</Link>
+            <a href="#features" className="text-sm text-muted-foreground transition-colors hover:text-foreground">Features</a>
             <a href="#pricing" className="text-sm text-muted-foreground transition-colors hover:text-foreground">Pricing</a>
           </div>
           <div className="flex items-center gap-3">
@@ -220,49 +232,124 @@ export default function LandingPage() {
             </p>
           </div>
 
-          <div className="mt-16 grid gap-8 lg:grid-cols-3">
-            {plans.map((plan, i) => (
-              <motion.div
-                key={plan.name}
-                className={`relative overflow-hidden rounded-xl border ${
-                  plan.popular ? 'border-primary shadow-lg shadow-primary/10' : 'border-border'
-                } bg-card p-8`}
-                initial={{ opacity: 0, y: 20 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.5, delay: i * 0.1 }}
-                viewport={{ once: true }}
-              >
-                {plan.popular && (
-                  <div className="absolute top-0 right-0 rounded-bl-lg bg-primary px-3 py-1 text-xs font-medium text-primary-foreground">
-                    Popular
+          <div className="mt-16 space-y-8">
+            {/* Free trial */}
+            <motion.div
+              className="relative overflow-hidden rounded-xl border border-border bg-card p-8"
+              initial={{ opacity: 0, y: 20 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.5 }}
+              viewport={{ once: true }}
+            >
+              <div className="flex items-start justify-between gap-6">
+                <div>
+                  <h3 className="text-lg font-semibold">{freeTrial.label}</h3>
+                  <div className="mt-4 flex items-baseline gap-2">
+                    <span className="text-4xl font-bold">{freeTrial.price}</span>
+                    <span className="text-muted-foreground">{freeTrial.days}</span>
                   </div>
-                )}
-                <h3 className="text-lg font-semibold">{plan.name}</h3>
-                <div className="mt-4 flex items-baseline gap-1">
-                  <span className="text-4xl font-bold">{plan.price}</span>
-                  {plan.period && <span className="text-muted-foreground">{plan.period}</span>}
+                  <p className="mt-2 text-sm text-muted-foreground">
+                    Try everything risk-free. Then choose your subscription duration.
+                  </p>
                 </div>
-                <p className="mt-2 text-sm text-muted-foreground">{plan.description}</p>
-                
-                <ul className="mt-8 space-y-3">
-                  {plan.features.map((feature) => (
-                    <li key={feature} className="flex items-center gap-3 text-sm">
-                      <Check className="h-4 w-4 shrink-0 text-primary" />
-                      {feature}
-                    </li>
-                  ))}
-                </ul>
+                <div className="hidden md:block">
+                  <div className="rounded-lg border border-border bg-muted/30 px-4 py-3 text-sm text-muted-foreground">
+                    Includes barcode scanning, IMEI tracking, POS, inventory and reports.
+                  </div>
+                </div>
+              </div>
 
-                <Link href="/signup" className="mt-8 block">
-                  <Button 
-                    className="w-full" 
-                    variant={plan.popular ? 'default' : 'outline'}
-                  >
-                    Get Started
-                  </Button>
+              <ul className="mt-6 grid gap-3 sm:grid-cols-2">
+                {[
+                  'Barcode scanning (camera + scanners)',
+                  'Auto product lookup (barcode → details)',
+                  'IMEI management',
+                  'POS + receipt printing',
+                  'Inventory tracking',
+                  'Sales history + refunds',
+                ].map((item) => (
+                  <li key={item} className="flex items-center gap-3 text-sm">
+                    <Check className="h-4 w-4 shrink-0 text-primary" />
+                    {item}
+                  </li>
+                ))}
+              </ul>
+
+              <div className="mt-8">
+                <Link href="/signup" className="block">
+                  <Button className="w-full md:w-auto">Start Free Trial</Button>
                 </Link>
-              </motion.div>
-            ))}
+              </div>
+            </motion.div>
+
+            {/* Paid tiers */}
+            <div className="grid gap-8 lg:grid-cols-3">
+              {pricingTiers.map((tier, i) => (
+                <motion.div
+                  key={tier.key}
+                  className={`relative overflow-hidden rounded-xl border ${
+                    tier.highlight ? 'border-primary shadow-lg shadow-primary/10' : 'border-border'
+                  } bg-card p-8`}
+                  initial={{ opacity: 0, y: 20 }}
+                  whileInView={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.5, delay: i * 0.08 }}
+                  viewport={{ once: true }}
+                >
+                  {tier.highlight && (
+                    <div className="absolute top-0 right-0 rounded-bl-lg bg-primary px-3 py-1 text-xs font-medium text-primary-foreground">
+                      Most Popular
+                    </div>
+                  )}
+
+                  <h3 className="text-lg font-semibold">{tier.title}</h3>
+
+                  <div className="mt-6 grid gap-4 sm:grid-cols-2">
+                    <div className="rounded-lg border border-border bg-muted/20 p-4">
+                      <p className="text-sm text-muted-foreground">1 Shop</p>
+                      <p className="mt-1 text-3xl font-bold">
+                        €{tier.singlePrice}
+                        <span className="ml-2 text-sm font-normal text-muted-foreground">
+                          {tier.singleSuffix}
+                        </span>
+                      </p>
+                    </div>
+
+                    <div className="rounded-lg border border-border bg-muted/20 p-4">
+                      <p className="text-sm text-muted-foreground">More than 1 shop</p>
+                      <p className="mt-1 text-3xl font-bold">
+                        €{tier.multiPrice}
+                        <span className="ml-2 text-sm font-normal text-muted-foreground">
+                          {tier.multiSuffix}
+                        </span>
+                      </p>
+                    </div>
+                  </div>
+
+                  <ul className="mt-7 space-y-3">
+                    {[
+                      'Unlimited products',
+                      'Barcode scanning + lookup',
+                      'IMEI tracking',
+                      'POS + receipt printing',
+                      'Sales reports',
+                    ].map((item) => (
+                      <li key={item} className="flex items-center gap-3 text-sm">
+                        <Check className="h-4 w-4 shrink-0 text-primary" />
+                        {item}
+                      </li>
+                    ))}
+                  </ul>
+
+                  <div className="mt-8">
+                    <Link href="/signup" className="block">
+                      <Button className="w-full" variant={tier.highlight ? 'default' : 'outline'}>
+                        Choose {tier.title}
+                      </Button>
+                    </Link>
+                  </div>
+                </motion.div>
+              ))}
+            </div>
           </div>
         </div>
       </section>
