@@ -389,6 +389,9 @@ export default function LandingPage() {
             <p className="text-sm text-muted-foreground">
               2024 Bonus Stock Manager. All rights reserved.
             </p>
+            <p className="text-sm text-muted-foreground">
+              Launched By <span className="font-medium">Bonus IT Solutions</span>
+            </p>
           </div>
         </div>
       </footer>
