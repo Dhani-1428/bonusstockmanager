@@ -51,7 +51,7 @@ export default function ForgotPasswordPage() {
           <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary">
             <Smartphone className="h-5 w-5 text-primary-foreground" />
           </div>
-          <span className="text-xl font-semibold">MobileStock Pro</span>
+          <span className="text-xl font-semibold">Bonus Stock Manager</span>
         </Link>
 
         {isSubmitted ? (

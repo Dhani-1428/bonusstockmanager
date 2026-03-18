@@ -88,7 +88,7 @@ export default function LandingPage() {
             <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary">
               <Smartphone className="h-5 w-5 text-primary-foreground" />
             </div>
-            <span className="text-xl font-semibold">MobileStock Pro</span>
+            <span className="text-xl font-semibold">Bonus Stock Manager</span>
           </div>
           <div className="hidden items-center gap-8 md:flex">
             <a href="#features" className="text-sm text-muted-foreground transition-colors hover:text-foreground">Features</a>
@@ -362,7 +362,7 @@ export default function LandingPage() {
               Ready to transform your shop?
             </h2>
             <p className="mt-4 text-lg text-muted-foreground">
-              Join thousands of mobile shop owners who trust MobileStock Pro for their daily operations.
+              Join thousands of mobile shop owners who trust Bonus Stock Manager for their daily operations.
             </p>
             <div className="mt-10">
               <Link href="/signup">
@@ -384,10 +384,10 @@ export default function LandingPage() {
               <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary">
                 <Smartphone className="h-4 w-4 text-primary-foreground" />
               </div>
-              <span className="font-semibold">MobileStock Pro</span>
+              <span className="font-semibold">Bonus Stock Manager</span>
             </div>
             <p className="text-sm text-muted-foreground">
-              2024 MobileStock Pro. All rights reserved.
+              2024 Bonus Stock Manager. All rights reserved.
             </p>
           </div>
         </div>
