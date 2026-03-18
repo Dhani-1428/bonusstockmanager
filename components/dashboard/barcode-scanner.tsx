@@ -194,39 +194,59 @@ export function BarcodeScanner({
           return
         }
         
-        console.log('Starting barcode scanning...')
-        
-        // Use decodeFromVideoDevice which continuously scans
-        try {
-          codeReaderRef.current.decodeFromVideoDevice(
-            null,
-            videoRef.current,
-            (result, error) => {
-              if (result) {
+        // Some mobile browsers report readyState but videoWidth/videoHeight are still 0.
+        // ZXing needs real dimensions to decode correctly.
+        const tryStart = (attempt: number) => {
+          if (!videoRef.current || !codeReaderRef.current) return
+          const { videoWidth, videoHeight } = videoRef.current
+          if (videoWidth > 0 && videoHeight > 0) {
+            console.log('Starting barcode scanning...')
+            toast.message('Scanning barcode...')
+            
+            // Use decodeFromVideoDevice which continuously scans
+            try {
+              codeReaderRef.current.decodeFromVideoDevice(
+                null,
+                videoRef.current,
+                (result, error) => {
+                  if (result) {
                     const code = result.getText()?.trim().replace(/\s+/g, '') || ''
                     if (!code) return
-                console.log('Barcode detected:', code)
-                
-                // Haptic feedback on mobile
-                if (navigator.vibrate) {
-                  navigator.vibrate(100)
+                    console.log('Barcode detected:', code)
+                    
+                    // Haptic feedback on mobile
+                    if (navigator.vibrate) {
+                      navigator.vibrate(100)
+                    }
+                    
+                    onScan(code)
+                    stopCamera()
+                    setOpen(false)
+                    toast.success(`Scanned: ${code}`)
+                  }
+                  // NotFoundException is expected when no barcode is in view
+                  if (error && error.name !== 'NotFoundException') {
+                    console.debug('Barcode scan error:', error.name)
+                  }
                 }
-                
-                onScan(code)
-                stopCamera()
-                setOpen(false)
-                toast.success(`Scanned: ${code}`)
-              }
-              // NotFoundException is expected when no barcode is in view
-              if (error && error.name !== 'NotFoundException') {
-                console.debug('Barcode scan error:', error.name)
-              }
+              )
+            } catch (scanError) {
+              console.error('Error starting barcode scanner:', scanError)
+              toast.error('Error starting barcode scanner')
             }
-          )
-        } catch (scanError) {
-          console.error('Error starting barcode scanner:', scanError)
-          toast.error('Error starting barcode scanner')
+            return
+          }
+
+          if (attempt >= 10) {
+            console.warn('Video dimensions not available for scanning', { videoWidth, videoHeight })
+            toast.error('Camera not ready for scanning yet. Please try again.')
+            return
+          }
+
+          setTimeout(() => tryStart(attempt + 1), 200)
         }
+        
+        tryStart(0)
       }
       
       // Wait for video metadata to load
