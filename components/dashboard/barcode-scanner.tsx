@@ -92,17 +92,22 @@ export function BarcodeScanner({
   // Handle barcode scanner input (most scanners act like keyboards)
   useEffect(() => {
     const handleKeyPress = (e: KeyboardEvent) => {
-      // Ignore if input is focused
-      if (document.activeElement?.tagName === "INPUT") return
+      // Ignore typing only in this dialog's manual input.
+      // POS page keeps its own barcode input focused, and external scanners
+      // send keystrokes to the focused field — we still want to capture those.
+      if (document.activeElement === inputRef.current) return
 
       if (bufferTimeoutRef.current) {
         clearTimeout(bufferTimeoutRef.current)
       }
 
-      if (e.key === "Enter" && buffer.length > 5) {
-        onScan(buffer)
+      if (e.key === "Enter" && buffer.length > 0) {
+        const cleaned = buffer.trim().replace(/\s+/g, '')
+        if (cleaned.length > 5) {
+          onScan(cleaned)
+          toast.success(`Scanned: ${cleaned}`)
+        }
         setBuffer("")
-        toast.success(`Scanned: ${buffer}`)
         return
       }
 
@@ -115,9 +120,9 @@ export function BarcodeScanner({
       }, 100)
     }
 
-    window.addEventListener("keypress", handleKeyPress)
+    window.addEventListener("keydown", handleKeyPress)
     return () => {
-      window.removeEventListener("keypress", handleKeyPress)
+      window.removeEventListener("keydown", handleKeyPress)
       if (bufferTimeoutRef.current) {
         clearTimeout(bufferTimeoutRef.current)
       }
@@ -198,7 +203,8 @@ export function BarcodeScanner({
             videoRef.current,
             (result, error) => {
               if (result) {
-                const code = result.getText()
+                    const code = result.getText()?.trim().replace(/\s+/g, '') || ''
+                    if (!code) return
                 console.log('Barcode detected:', code)
                 
                 // Haptic feedback on mobile
