@@ -100,6 +100,24 @@ Then test connection:
 curl http://localhost:3000/api/db-ping
 ```
 
+Initialize required tables/columns:
+
+```bash
+curl -X POST http://localhost:3000/api/db-init
+```
+
+Optional protection:
+
+```env
+DB_INIT_KEY=your-secret-key
+```
+
+Then call:
+
+```bash
+curl -X POST http://localhost:3000/api/db-init -H "x-db-init-key: your-secret-key"
+```
+
 ## Usage
 
 ### First Time Setup
