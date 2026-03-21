@@ -36,9 +36,6 @@ export function getMysqlPool() {
   if (!password) {
     throw new Error('MYSQL_PASSWORD is missing')
   }
-  if (!database) {
-    throw new Error('MYSQL_DATABASE is missing')
-  }
 
   const ca = getSslCa()
 
@@ -47,7 +44,7 @@ export function getMysqlPool() {
     port,
     user,
     password,
-    database,
+    ...(database ? { database } : {}),
     waitForConnections: true,
     connectionLimit: 10,
     queueLimit: 0,
