@@ -45,6 +45,7 @@ export function BarcodeScanner({
   const [facingMode, setFacingMode] = useState<'environment' | 'user'>('environment')
   const [isFullscreen, setIsFullscreen] = useState(false)
   const [cameraError, setCameraError] = useState<string | null>(null)
+  const [isFrameScanning, setIsFrameScanning] = useState(false)
   const videoRef = useRef<HTMLVideoElement>(null)
   const streamRef = useRef<MediaStream | null>(null)
   const inputRef = useRef<HTMLInputElement>(null)
@@ -54,6 +55,25 @@ export function BarcodeScanner({
   const bufferTimeoutRef = useRef<NodeJS.Timeout | null>(null)
   const containerRef = useRef<HTMLDivElement>(null)
   const hasHandledScanRef = useRef(false)
+
+  const getCodeReader = () => {
+    if (codeReaderRef.current) return codeReaderRef.current
+    const hints = new Map()
+    hints.set(DecodeHintType.POSSIBLE_FORMATS, [
+      BarcodeFormat.EAN_13,
+      BarcodeFormat.EAN_8,
+      BarcodeFormat.UPC_A,
+      BarcodeFormat.UPC_E,
+      BarcodeFormat.CODE_128,
+      BarcodeFormat.CODE_39,
+      BarcodeFormat.ITF,
+      BarcodeFormat.QR_CODE,
+    ])
+    hints.set(DecodeHintType.TRY_HARDER, true)
+    const reader = new BrowserMultiFormatReader(hints)
+    codeReaderRef.current = reader
+    return reader
+  }
 
   // Check for camera availability
   useEffect(() => {
@@ -152,20 +172,7 @@ export function BarcodeScanner({
         throw new Error('Video element not available')
       }
       
-      const hints = new Map()
-      hints.set(DecodeHintType.POSSIBLE_FORMATS, [
-        BarcodeFormat.EAN_13,
-        BarcodeFormat.EAN_8,
-        BarcodeFormat.UPC_A,
-        BarcodeFormat.UPC_E,
-        BarcodeFormat.CODE_128,
-        BarcodeFormat.CODE_39,
-        BarcodeFormat.ITF,
-        BarcodeFormat.QR_CODE,
-      ])
-      hints.set(DecodeHintType.TRY_HARDER, true)
-
-      const codeReader = new BrowserMultiFormatReader(hints)
+      const codeReader = getCodeReader()
       codeReaderRef.current = codeReader
       
       // Simplified video constraints for better compatibility
@@ -352,6 +359,65 @@ export function BarcodeScanner({
     }
   }
 
+  const scanCurrentFrame = async () => {
+    if (!videoRef.current || !isScanning || isFrameScanning) return
+    setIsFrameScanning(true)
+    try {
+      const video = videoRef.current
+      if (video.videoWidth <= 0 || video.videoHeight <= 0) {
+        toast.error("Camera frame not ready yet")
+        return
+      }
+
+      const canvas = document.createElement("canvas")
+      canvas.width = video.videoWidth
+      canvas.height = video.videoHeight
+      const ctx = canvas.getContext("2d")
+      if (!ctx) {
+        toast.error("Could not read camera frame")
+        return
+      }
+      ctx.drawImage(video, 0, 0, canvas.width, canvas.height)
+
+      const reader: any = getCodeReader()
+      let decodedText = ""
+
+      // Try direct image element decode first.
+      try {
+        const result = await reader.decodeFromImageElement(canvas as any)
+        decodedText = result?.getText?.() || ""
+      } catch {
+        // Fallback to data URL decode for environments where image-element decode fails.
+        const dataUrl = canvas.toDataURL("image/png")
+        try {
+          const result = await reader.decodeFromImageUrl(dataUrl)
+          decodedText = result?.getText?.() || ""
+        } catch {
+          decodedText = ""
+        }
+      }
+
+      const code = decodedText.trim().replace(/\s+/g, "")
+      if (!code) {
+        toast.error("No barcode found in current frame. Hold steady and try again.")
+        return
+      }
+
+      if (!hasHandledScanRef.current) {
+        hasHandledScanRef.current = true
+        onScan(code)
+        stopCamera()
+        setOpen(false)
+        toast.success(`Scanned: ${code}`)
+      }
+    } catch (err) {
+      console.error("Frame scan error:", err)
+      toast.error("Could not scan this frame")
+    } finally {
+      setIsFrameScanning(false)
+    }
+  }
+
   const stopCamera = useCallback(() => {
     if (codeReaderRef.current) {
       codeReaderRef.current.reset()
@@ -475,6 +541,19 @@ export function BarcodeScanner({
                       <p className="text-center text-sm text-muted-foreground mt-2">
                         Position barcode within the frame
                       </p>
+                    )}
+                    {!isMobile() && (
+                      <div className="mt-3 flex justify-center">
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={scanCurrentFrame}
+                          disabled={isFrameScanning}
+                        >
+                          {isFrameScanning ? "Scanning..." : "Scan Current Frame"}
+                        </Button>
+                      </div>
                     )}
                     
                     {isMobile() && (
