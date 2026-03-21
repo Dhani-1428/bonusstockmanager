@@ -6,6 +6,8 @@ import { AuthProvider } from '@/lib/auth-context'
 import { Toaster } from 'sonner'
 import './globals.css'
 
+export const dynamic = 'force-dynamic'
+
 const _geist = Geist({ subsets: ["latin"] });
 const _geistMono = Geist_Mono({ subsets: ["latin"] });
 

@@ -371,92 +371,116 @@ export function BarcodeScanner({
         return
       }
 
-      const canvas = document.createElement("canvas")
-      canvas.width = video.videoWidth
-      canvas.height = video.videoHeight
-      const ctx = canvas.getContext("2d")
-      if (!ctx) {
+      const fullCanvas = document.createElement("canvas")
+      fullCanvas.width = video.videoWidth
+      fullCanvas.height = video.videoHeight
+      const fullCtx = fullCanvas.getContext("2d")
+      if (!fullCtx) {
         toast.error("Could not read camera frame")
         return
       }
-      ctx.drawImage(video, 0, 0, canvas.width, canvas.height)
+      fullCtx.drawImage(video, 0, 0, fullCanvas.width, fullCanvas.height)
 
-      // 1) Try native detector on the current video frame first.
+      const createCropCanvas = (scale: number) => {
+        const cropW = Math.floor(fullCanvas.width * scale)
+        const cropH = Math.floor(fullCanvas.height * scale)
+        const sx = Math.floor((fullCanvas.width - cropW) / 2)
+        const sy = Math.floor((fullCanvas.height - cropH) / 2)
+        const c = document.createElement("canvas")
+        // Upscale crop to help decoders with low-resolution laptop cameras.
+        c.width = cropW * 2
+        c.height = cropH * 2
+        const cctx = c.getContext("2d")
+        if (cctx) {
+          cctx.imageSmoothingEnabled = false
+          cctx.drawImage(fullCanvas, sx, sy, cropW, cropH, 0, 0, c.width, c.height)
+        }
+        return c
+      }
+
+      const attempts: HTMLCanvasElement[] = [
+        fullCanvas,
+        createCropCanvas(0.8),
+        createCropCanvas(0.6),
+        createCropCanvas(0.45),
+      ]
+
       let decodedText = ""
       const win = window as any
-      if (typeof win.BarcodeDetector !== "undefined") {
-        try {
-          const detector: BarcodeDetectorLike = new win.BarcodeDetector({
-            formats: [
-              "ean_13",
-              "ean_8",
-              "upc_a",
-              "upc_e",
-              "code_128",
-              "code_39",
-              "itf",
-              "qr_code",
-            ],
-          })
-          const detections = await detector.detect(video)
-          decodedText = detections?.[0]?.rawValue?.trim() || ""
-        } catch {
-          // Continue to ZXing fallback below.
-        }
-      }
+      const reader: any = getCodeReader()
 
-      // 2) Fallback to ZXing by decoding a real image element generated from the frame.
-      if (!decodedText) {
-        const reader: any = getCodeReader()
-        const dataUrl = canvas.toDataURL("image/png")
-        const img = new Image()
-        await new Promise<void>((resolve, reject) => {
-          img.onload = () => resolve()
-          img.onerror = () => reject(new Error("Could not load frame image"))
-          img.src = dataUrl
-        })
+      for (const attemptCanvas of attempts) {
+        if (decodedText) break
+        const dataUrl = attemptCanvas.toDataURL("image/png")
 
-        try {
-          const result = await reader.decodeFromImageElement(img)
-          decodedText = result?.getText?.() || ""
-        } catch {
+        // 1) Native BarcodeDetector
+        if (typeof win.BarcodeDetector !== "undefined" && !decodedText) {
           try {
-            const result = await reader.decodeFromImageUrl(dataUrl)
-            decodedText = result?.getText?.() || ""
+            const detector: BarcodeDetectorLike = new win.BarcodeDetector({
+              formats: [
+                "ean_13",
+                "ean_8",
+                "upc_a",
+                "upc_e",
+                "code_128",
+                "code_39",
+                "itf",
+                "qr_code",
+              ],
+            })
+            const detections = await detector.detect(attemptCanvas)
+            decodedText = detections?.[0]?.rawValue?.trim() || ""
           } catch {
-            decodedText = ""
+            // continue
           }
         }
-      }
 
-      // 3) Final fallback: Quagga single-image decode (great for 1D product barcodes).
-      if (!decodedText) {
-        const dataUrl = canvas.toDataURL("image/png")
-        decodedText = await new Promise<string>((resolve) => {
-          Quagga.decodeSingle(
-            {
-              src: dataUrl,
-              numOfWorkers: 0,
-              inputStream: { size: 1200 },
-              locator: { patchSize: "medium", halfSample: true },
-              decoder: {
-                readers: [
-                  "ean_reader",
-                  "ean_8_reader",
-                  "upc_reader",
-                  "upc_e_reader",
-                  "code_128_reader",
-                  "code_39_reader",
-                  "i2of5_reader",
-                ],
-              },
-            },
-            (result) => {
-              const code = result?.codeResult?.code || ""
-              resolve(code)
+        // 2) ZXing image decode
+        if (!decodedText) {
+          const img = new Image()
+          try {
+            await new Promise<void>((resolve, reject) => {
+              img.onload = () => resolve()
+              img.onerror = () => reject(new Error("Could not load frame image"))
+              img.src = dataUrl
+            })
+            const result = await reader.decodeFromImageElement(img)
+            decodedText = result?.getText?.() || ""
+          } catch {
+            try {
+              const result = await reader.decodeFromImageUrl(dataUrl)
+              decodedText = result?.getText?.() || ""
+            } catch {
+              // continue to Quagga fallback
             }
-          )
-        })
+          }
+        }
+
+        // 3) Quagga single-image decode
+        if (!decodedText) {
+          decodedText = await new Promise<string>((resolve) => {
+            Quagga.decodeSingle(
+              {
+                src: dataUrl,
+                numOfWorkers: 0,
+                inputStream: { size: 1600 },
+                locator: { patchSize: "large", halfSample: false },
+                decoder: {
+                  readers: [
+                    "ean_reader",
+                    "ean_8_reader",
+                    "upc_reader",
+                    "upc_e_reader",
+                    "code_128_reader",
+                    "code_39_reader",
+                    "i2of5_reader",
+                  ],
+                },
+              },
+              (result) => resolve(result?.codeResult?.code || "")
+            )
+          })
+        }
       }
 
       const code = decodedText.trim().replace(/\s+/g, "")

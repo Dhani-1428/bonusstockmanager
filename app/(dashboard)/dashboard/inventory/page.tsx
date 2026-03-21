@@ -392,7 +392,7 @@ function ProductForm({
           if (productInfo.sku) return productInfo.sku
           if (productInfo.name && productInfo.brand) {
             const brandPrefix = productInfo.brand.substring(0, 3).toUpperCase()
-            const nameParts = productInfo.name.split(' ').slice(0, 2).map(w => w.substring(0, 3).toUpperCase())
+            const nameParts = productInfo.name.split(' ').slice(0, 2).map((w: string) => w.substring(0, 3).toUpperCase())
             return `${brandPrefix}-${nameParts.join('-')}-${code.substring(code.length - 4)}`
           }
           return code // Use barcode as SKU fallback
