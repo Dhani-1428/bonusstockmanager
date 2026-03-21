@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback } from "react"
 import { BrowserMultiFormatReader, BarcodeFormat, DecodeHintType } from "@zxing/library"
+import Quagga from "@ericblade/quagga2"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -426,6 +427,36 @@ export function BarcodeScanner({
             decodedText = ""
           }
         }
+      }
+
+      // 3) Final fallback: Quagga single-image decode (great for 1D product barcodes).
+      if (!decodedText) {
+        const dataUrl = canvas.toDataURL("image/png")
+        decodedText = await new Promise<string>((resolve) => {
+          Quagga.decodeSingle(
+            {
+              src: dataUrl,
+              numOfWorkers: 0,
+              inputStream: { size: 1200 },
+              locator: { patchSize: "medium", halfSample: true },
+              decoder: {
+                readers: [
+                  "ean_reader",
+                  "ean_8_reader",
+                  "upc_reader",
+                  "upc_e_reader",
+                  "code_128_reader",
+                  "code_39_reader",
+                  "i2of5_reader",
+                ],
+              },
+            },
+            (result) => {
+              const code = result?.codeResult?.code || ""
+              resolve(code)
+            }
+          )
+        })
       }
 
       const code = decodedText.trim().replace(/\s+/g, "")
