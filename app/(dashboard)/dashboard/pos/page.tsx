@@ -52,6 +52,12 @@ export default function POSPage() {
   useEffect(() => {
     if (currentShop) {
       setProducts(getProducts(currentShop.id))
+      // Reset transactional state when switching shops so old-shop cart/items
+      // don't carry over into the newly selected shop.
+      setCart([])
+      setImeiSelectProduct(null)
+      setBarcodeInput('')
+      setSearchQuery('')
     }
   }, [currentShop])
 

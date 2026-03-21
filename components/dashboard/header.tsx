@@ -17,6 +17,7 @@ import {
 import { useTheme } from 'next-themes'
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet'
 import { MobileSidebar } from './mobile-sidebar'
+import { toast } from 'sonner'
 
 export function DashboardHeader() {
   const { user, currentShop, shops, switchShop, logout } = useAuth()
@@ -51,7 +52,10 @@ export function DashboardHeader() {
           {shops.map((shop) => (
             <DropdownMenuItem 
               key={shop.id}
-              onClick={() => switchShop(shop.id)}
+              onSelect={() => {
+                switchShop(shop.id)
+                toast.success(`Switched to ${shop.name}`)
+              }}
               className={currentShop?.id === shop.id ? 'bg-accent' : ''}
             >
               <Store className="mr-2 h-4 w-4" />
