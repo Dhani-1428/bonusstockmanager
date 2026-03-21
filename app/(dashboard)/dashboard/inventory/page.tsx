@@ -4,7 +4,7 @@ import { useEffect, useState, useMemo } from 'react'
 import { useAuth } from '@/lib/auth-context'
 import { 
   getProducts, getCategories, deleteProduct, 
-  getAvailableIMEIs, createProduct, updateProduct, getProductByBarcode
+  getAvailableIMEIs, createProduct, updateProduct, getProductByBarcode, createCategory
 } from '@/lib/store'
 import type { Product, Category } from '@/lib/types'
 import { Button } from '@/components/ui/button'
@@ -60,7 +60,17 @@ export default function InventoryPage() {
   const loadData = () => {
     if (!currentShop) return
     setProducts(getProducts(currentShop.id))
-    setCategories(getCategories(currentShop.id))
+
+    const shopCategories = getCategories(currentShop.id)
+    if (shopCategories.length === 0) {
+      // Ensure every shop has at least the basic category set.
+      createCategory({ name: 'Phones', type: 'phone', shopId: currentShop.id })
+      createCategory({ name: 'Accessories', type: 'accessory', shopId: currentShop.id })
+      createCategory({ name: 'Spare Parts', type: 'spare_part', shopId: currentShop.id })
+      setCategories(getCategories(currentShop.id))
+    } else {
+      setCategories(shopCategories)
+    }
   }
 
   useEffect(() => {
