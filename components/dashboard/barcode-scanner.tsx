@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect, useRef, useCallback } from "react"
-import { BrowserMultiFormatReader } from "@zxing/library"
+import { BrowserMultiFormatReader, BarcodeFormat, DecodeHintType } from "@zxing/library"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -152,15 +152,29 @@ export function BarcodeScanner({
         throw new Error('Video element not available')
       }
       
-      const codeReader = new BrowserMultiFormatReader()
+      const hints = new Map()
+      hints.set(DecodeHintType.POSSIBLE_FORMATS, [
+        BarcodeFormat.EAN_13,
+        BarcodeFormat.EAN_8,
+        BarcodeFormat.UPC_A,
+        BarcodeFormat.UPC_E,
+        BarcodeFormat.CODE_128,
+        BarcodeFormat.CODE_39,
+        BarcodeFormat.ITF,
+        BarcodeFormat.QR_CODE,
+      ])
+      hints.set(DecodeHintType.TRY_HARDER, true)
+
+      const codeReader = new BrowserMultiFormatReader(hints)
       codeReaderRef.current = codeReader
       
       // Simplified video constraints for better compatibility
       const constraints: MediaStreamConstraints = {
         audio: false,
         video: {
-          // iOS Safari is more reliable with ideal facingMode constraints
           facingMode: { ideal: facingMode },
+          width: { ideal: 1920 },
+          height: { ideal: 1080 },
         } as MediaTrackConstraints,
       }
       
