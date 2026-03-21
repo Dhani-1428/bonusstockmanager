@@ -29,6 +29,10 @@ interface BarcodeScannerProps {
   buttonVariant?: "default" | "outline" | "ghost"
 }
 
+type BarcodeDetectorLike = {
+  detect: (source: ImageBitmapSource) => Promise<Array<{ rawValue?: string }>>
+}
+
 export function BarcodeScanner({
   onScan,
   buttonText = "Scan Barcode",
@@ -49,6 +53,7 @@ export function BarcodeScanner({
   const [buffer, setBuffer] = useState("")
   const bufferTimeoutRef = useRef<NodeJS.Timeout | null>(null)
   const containerRef = useRef<HTMLDivElement>(null)
+  const hasHandledScanRef = useRef(false)
 
   // Check for camera availability
   useEffect(() => {
@@ -133,6 +138,7 @@ export function BarcodeScanner({
     try {
       setCameraError(null)
       setIsScanning(true) // Set scanning state early to show loading
+      hasHandledScanRef.current = false
       
       // Check if getUserMedia is available
       if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
@@ -193,6 +199,19 @@ export function BarcodeScanner({
           console.error('Video or codeReader not available for scanning')
           return
         }
+
+        const handleDetectedCode = (rawCode: string) => {
+          if (hasHandledScanRef.current) return
+          const code = rawCode?.trim().replace(/\s+/g, '') || ''
+          if (!code) return
+          hasHandledScanRef.current = true
+          console.log('Barcode detected:', code)
+          if (navigator.vibrate) navigator.vibrate(100)
+          onScan(code)
+          stopCamera()
+          setOpen(false)
+          toast.success(`Scanned: ${code}`)
+        }
         
         // Some mobile browsers report readyState but videoWidth/videoHeight are still 0.
         // ZXing needs real dimensions to decode correctly.
@@ -210,19 +229,7 @@ export function BarcodeScanner({
                 videoRef.current,
                 (result, error) => {
                   if (result) {
-                    const code = result.getText()?.trim().replace(/\s+/g, '') || ''
-                    if (!code) return
-                    console.log('Barcode detected:', code)
-                    
-                    // Haptic feedback on mobile
-                    if (navigator.vibrate) {
-                      navigator.vibrate(100)
-                    }
-                    
-                    onScan(code)
-                    stopCamera()
-                    setOpen(false)
-                    toast.success(`Scanned: ${code}`)
+                    handleDetectedCode(result.getText())
                   }
                   // NotFoundException is expected when no barcode is in view
                   if (error && error.name !== 'NotFoundException') {
@@ -233,6 +240,40 @@ export function BarcodeScanner({
             } catch (scanError) {
               console.error('Error starting barcode scanner:', scanError)
               toast.error('Error starting barcode scanner')
+            }
+
+            // Fallback for supported browsers/devices: native BarcodeDetector
+            // helps when ZXing has trouble decoding on certain mobile cameras.
+            const win = window as any
+            if (typeof win.BarcodeDetector !== 'undefined' && videoRef.current) {
+              try {
+                const detector: BarcodeDetectorLike = new win.BarcodeDetector({
+                  formats: [
+                    'ean_13',
+                    'ean_8',
+                    'upc_a',
+                    'upc_e',
+                    'code_128',
+                    'code_39',
+                    'itf',
+                    'qr_code',
+                  ],
+                })
+
+                if (scanIntervalRef.current) clearInterval(scanIntervalRef.current)
+                scanIntervalRef.current = setInterval(async () => {
+                  if (!videoRef.current || hasHandledScanRef.current) return
+                  try {
+                    const detections = await detector.detect(videoRef.current)
+                    const first = detections?.[0]?.rawValue
+                    if (first) handleDetectedCode(first)
+                  } catch {
+                    // Ignore detector frame errors and continue scanning.
+                  }
+                }, 350)
+              } catch {
+                // Ignore BarcodeDetector setup failures.
+              }
             }
             return
           }
