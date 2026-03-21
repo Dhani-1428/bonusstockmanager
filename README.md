@@ -75,49 +75,6 @@ For Gmail, you'll need to:
 1. Enable 2-factor authentication
 2. Generate an App Password: https://myaccount.google.com/apppasswords
 
-### MySQL (AWS RDS) Setup (Optional)
-
-If you want to use MySQL from this project, configure `.env.local`:
-
-```env
-MYSQL_HOST=bonusstockmanager.ctu4682g825l.eu-north-1.rds.amazonaws.com
-MYSQL_PORT=3306
-MYSQL_USER=admin
-MYSQL_PASSWORD=your-db-password
-MYSQL_DATABASE=your_database_name
-
-# Choose one SSL option:
-# 1) Put the CA certificate file in project root and use path:
-MYSQL_SSL_CA_PATH=./global-bundle.pem
-
-# 2) Or provide full cert content directly:
-# MYSQL_SSL_CA_CONTENT="-----BEGIN CERTIFICATE-----..."
-```
-
-Then test connection:
-
-```bash
-curl http://localhost:3000/api/db-ping
-```
-
-Initialize required tables/columns:
-
-```bash
-curl -X POST http://localhost:3000/api/db-init
-```
-
-Optional protection:
-
-```env
-DB_INIT_KEY=your-secret-key
-```
-
-Then call:
-
-```bash
-curl -X POST http://localhost:3000/api/db-init -H "x-db-init-key: your-secret-key"
-```
-
 ## Usage
 
 ### First Time Setup
