@@ -174,10 +174,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   const switchShop = (shopId: string) => {
+    if (!user) return
+
+    // Re-check access from storage to avoid stale in-memory shopIds.
+    const userShops = getUserShops(user.id)
+    const hasAccess = userShops.some(s => s.id === shopId)
     const shop = getShopById(shopId)
-    if (shop && user?.shopIds.includes(shopId)) {
+
+    if (shop && hasAccess) {
       setCurrentShop(shopId)
       setCurrentShopData(shop)
+      setShops(userShops)
+      setUser(prev => (prev ? { ...prev, shopIds: userShops.map(s => s.id) } : prev))
     }
   }
 

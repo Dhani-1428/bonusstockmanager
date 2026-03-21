@@ -21,7 +21,7 @@ import { Store, Plus, Edit, MapPin, Phone, Mail, Building2, Check } from "lucide
 import { toast } from "sonner"
 
 export default function ShopsPage() {
-  const { user, switchShop, shops, currentShop } = useAuth()
+  const { user, switchShop, shops, currentShop, refreshUser } = useAuth()
   const [localShops, setLocalShops] = useState<Shop[]>([])
   const [dialogOpen, setDialogOpen] = useState(false)
   const [editingShop, setEditingShop] = useState<Shop | null>(null)
@@ -63,6 +63,9 @@ export default function ShopsPage() {
       })
       toast.success("Shop added successfully")
     }
+
+    // Refresh auth context so header/shop access stays in sync immediately.
+    refreshUser()
 
     if (user) {
       const userShops = getUserShops(user.id)
