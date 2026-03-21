@@ -363,6 +363,7 @@ export function BarcodeScanner({
     if (!videoRef.current || !isScanning || isFrameScanning) return
     setIsFrameScanning(true)
     try {
+      toast.message("Scanning current frame...")
       const video = videoRef.current
       if (video.videoWidth <= 0 || video.videoHeight <= 0) {
         toast.error("Camera frame not ready yet")
@@ -379,21 +380,51 @@ export function BarcodeScanner({
       }
       ctx.drawImage(video, 0, 0, canvas.width, canvas.height)
 
-      const reader: any = getCodeReader()
+      // 1) Try native detector on the current video frame first.
       let decodedText = ""
-
-      // Try direct image element decode first.
-      try {
-        const result = await reader.decodeFromImageElement(canvas as any)
-        decodedText = result?.getText?.() || ""
-      } catch {
-        // Fallback to data URL decode for environments where image-element decode fails.
-        const dataUrl = canvas.toDataURL("image/png")
+      const win = window as any
+      if (typeof win.BarcodeDetector !== "undefined") {
         try {
-          const result = await reader.decodeFromImageUrl(dataUrl)
+          const detector: BarcodeDetectorLike = new win.BarcodeDetector({
+            formats: [
+              "ean_13",
+              "ean_8",
+              "upc_a",
+              "upc_e",
+              "code_128",
+              "code_39",
+              "itf",
+              "qr_code",
+            ],
+          })
+          const detections = await detector.detect(video)
+          decodedText = detections?.[0]?.rawValue?.trim() || ""
+        } catch {
+          // Continue to ZXing fallback below.
+        }
+      }
+
+      // 2) Fallback to ZXing by decoding a real image element generated from the frame.
+      if (!decodedText) {
+        const reader: any = getCodeReader()
+        const dataUrl = canvas.toDataURL("image/png")
+        const img = new Image()
+        await new Promise<void>((resolve, reject) => {
+          img.onload = () => resolve()
+          img.onerror = () => reject(new Error("Could not load frame image"))
+          img.src = dataUrl
+        })
+
+        try {
+          const result = await reader.decodeFromImageElement(img)
           decodedText = result?.getText?.() || ""
         } catch {
-          decodedText = ""
+          try {
+            const result = await reader.decodeFromImageUrl(dataUrl)
+            decodedText = result?.getText?.() || ""
+          } catch {
+            decodedText = ""
+          }
         }
       }
 
