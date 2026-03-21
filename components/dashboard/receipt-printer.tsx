@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Separator } from "@/components/ui/separator"
 import { Sale, Shop, Product } from "@/lib/types"
-import { Printer, Download, X } from "lucide-react"
+import { Printer, Download, MessageCircle } from "lucide-react"
 import { format } from "date-fns"
 
 interface ReceiptPrinterProps {
@@ -115,6 +115,33 @@ Thank you for your purchase!
     URL.revokeObjectURL(url)
   }
 
+  const handleSendWhatsApp = () => {
+    const targetPhone = (sale.customerPhone || "").replace(/[^\d+]/g, "")
+    if (!targetPhone) {
+      window.alert("Customer phone is missing on this sale. Add customer phone to send via WhatsApp.")
+      return
+    }
+
+    const message = `
+${shop.name}
+Receipt #${sale.receiptNumber}
+Date: ${format(new Date(sale.createdAt), "PPP p")}
+
+${sale.items.map(item => `${getProductName(item.productId)} x${item.quantity} - $${(item.totalPrice || item.total).toFixed(2)}`).join("\n")}
+
+Subtotal: $${sale.subtotal.toFixed(2)}
+Tax: $${sale.taxAmount.toFixed(2)}
+Total: $${sale.totalAmount.toFixed(2)}
+Paid: $${sale.paidAmount.toFixed(2)}
+${sale.dueAmount > 0 ? `Due: $${sale.dueAmount.toFixed(2)}\n` : ""}Payment: ${sale.paymentMethod.toUpperCase()}
+
+Thank you for your purchase!
+    `.trim()
+
+    const whatsappUrl = `https://wa.me/${targetPhone}?text=${encodeURIComponent(message)}`
+    window.open(whatsappUrl, "_blank")
+  }
+
   return (
     <Dialog open={open} onOpenChange={onClose}>
       <DialogContent className="max-w-md">
@@ -129,6 +156,10 @@ Thank you for your purchase!
               <Button size="sm" variant="outline" onClick={handleDownload}>
                 <Download className="h-4 w-4 mr-1" />
                 Download
+              </Button>
+              <Button size="sm" variant="outline" onClick={handleSendWhatsApp}>
+                <MessageCircle className="h-4 w-4 mr-1" />
+                WhatsApp
               </Button>
             </div>
           </DialogTitle>

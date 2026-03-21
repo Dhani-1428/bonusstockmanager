@@ -28,7 +28,7 @@ import {
 import { 
   ScanBarcode, Plus, Minus, Trash2, ShoppingCart, 
   CreditCard, Banknote, Smartphone, Search, Receipt,
-  X, Check, Camera
+  X, Check, Camera, MessageCircle
 } from 'lucide-react'
 import { BarcodeScanner } from '@/components/dashboard/barcode-scanner'
 import { toast } from 'sonner'
@@ -46,7 +46,7 @@ export default function POSPage() {
   const [paymentMethod, setPaymentMethod] = useState<'cash' | 'card' | 'mobile'>('cash')
   const [isCheckoutOpen, setIsCheckoutOpen] = useState(false)
   const [imeiSelectProduct, setImeiSelectProduct] = useState<{ product: Product; availableImeis: IMEIRecord[] } | null>(null)
-  const [lastSale, setLastSale] = useState<{ receiptNumber: string; total: number } | null>(null)
+  const [lastSale, setLastSale] = useState<any | null>(null)
   const barcodeInputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
@@ -198,11 +198,98 @@ export default function POSPage() {
       staffId: user.id,
     })
 
-    setLastSale({ receiptNumber: sale.receiptNumber, total: sale.totalAmount })
+    setLastSale(sale)
     setIsCheckoutOpen(false)
     clearCart()
     setProducts(getProducts(currentShop.id)) // Refresh product stock
     toast.success('Sale completed!')
+  }
+
+  const printLastSale = () => {
+    if (!lastSale || !currentShop) return
+    const shop = getShopById(currentShop.id)
+    if (!shop) return
+
+    const printWindow = window.open("", "_blank")
+    if (!printWindow) return
+
+    const itemsHtml = lastSale.items
+      .map((item: any) => {
+        return `
+          <div style="display:flex;justify-content:space-between;margin:4px 0;">
+            <span>${item.productName} x${item.quantity}</span>
+            <span>$${(item.totalPrice || item.total).toFixed(2)}</span>
+          </div>
+        `
+      })
+      .join("")
+
+    printWindow.document.write(`
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <title>Receipt - ${lastSale.receiptNumber}</title>
+          <style>
+            body { font-family: 'Courier New', monospace; font-size: 12px; width: 300px; margin: 0 auto; padding: 20px; }
+            .center { text-align: center; }
+            .line { border-top: 1px dashed #000; margin: 10px 0; }
+          </style>
+        </head>
+        <body>
+          <div class="center"><strong>${shop.name}</strong></div>
+          <div class="center">${shop.address || ''}</div>
+          <div class="center">${shop.phone || ''}</div>
+          <div class="line"></div>
+          <div>Receipt: ${lastSale.receiptNumber}</div>
+          <div>Date: ${new Date(lastSale.createdAt).toLocaleString()}</div>
+          ${lastSale.customerName ? `<div>Customer: ${lastSale.customerName}</div>` : ''}
+          ${lastSale.customerPhone ? `<div>Phone: ${lastSale.customerPhone}</div>` : ''}
+          <div class="line"></div>
+          ${itemsHtml}
+          <div class="line"></div>
+          <div style="display:flex;justify-content:space-between;"><span>Subtotal</span><span>$${lastSale.subtotal.toFixed(2)}</span></div>
+          <div style="display:flex;justify-content:space-between;"><span>Tax</span><span>$${lastSale.taxAmount.toFixed(2)}</span></div>
+          <div style="display:flex;justify-content:space-between;font-weight:bold;"><span>Total</span><span>$${lastSale.totalAmount.toFixed(2)}</span></div>
+          <div style="display:flex;justify-content:space-between;"><span>Paid</span><span>$${lastSale.paidAmount.toFixed(2)}</span></div>
+          ${lastSale.dueAmount > 0 ? `<div style="display:flex;justify-content:space-between;"><span>Due</span><span>$${lastSale.dueAmount.toFixed(2)}</span></div>` : ''}
+          <div class="line"></div>
+          <div class="center">Thank you for your purchase!</div>
+        </body>
+      </html>
+    `)
+    printWindow.document.close()
+    printWindow.print()
+    printWindow.close()
+  }
+
+  const sendLastSaleWhatsApp = () => {
+    if (!lastSale || !currentShop) return
+    const shop = getShopById(currentShop.id)
+    if (!shop) return
+
+    const phone = (lastSale.customerPhone || '').replace(/[^\d+]/g, '')
+    if (!phone) {
+      toast.error('Customer phone missing for this receipt')
+      return
+    }
+
+    const message = `
+${shop.name}
+Receipt #${lastSale.receiptNumber}
+Date: ${new Date(lastSale.createdAt).toLocaleString()}
+
+${lastSale.items.map((item: any) => `${item.productName} x${item.quantity} - $${(item.totalPrice || item.total).toFixed(2)}`).join('\n')}
+
+Subtotal: $${lastSale.subtotal.toFixed(2)}
+Tax: $${lastSale.taxAmount.toFixed(2)}
+Total: $${lastSale.totalAmount.toFixed(2)}
+Paid: $${lastSale.paidAmount.toFixed(2)}
+${lastSale.dueAmount > 0 ? `Due: $${lastSale.dueAmount.toFixed(2)}\n` : ''}Payment: ${lastSale.paymentMethod.toUpperCase()}
+
+Thank you for your purchase!
+    `.trim()
+
+    window.open(`https://wa.me/${phone}?text=${encodeURIComponent(message)}`, '_blank')
   }
 
   const filteredProducts = products.filter(p =>
@@ -538,11 +625,12 @@ export default function POSPage() {
               <Button variant="outline" className="flex-1" onClick={() => setLastSale(null)}>
                 New Sale
               </Button>
-              <Button className="flex-1" onClick={() => {
-                toast.info('Receipt printing would be triggered here')
-                setLastSale(null)
-              }}>
+              <Button className="flex-1" onClick={printLastSale}>
                 Print Receipt
+              </Button>
+              <Button variant="outline" className="flex-1" onClick={sendLastSaleWhatsApp}>
+                <MessageCircle className="h-4 w-4 mr-1" />
+                WhatsApp
               </Button>
             </div>
           </div>
